@@ -39,8 +39,7 @@ export async function fetchDrugKnowledge(activeIngredient: string) {
   
   const prompt = `Gere informações técnicas detalhadas para o princípio ativo farmacêutico: ${activeIngredient}. 
   Foque em ser preciso para uso em balcão de farmácia. 
-  Importante: Classifique corretamente cada nome comercial como 'Referência', 'Similar' ou 'Genérico'. 
-  Geralmente há apenas um de Referência (ex: Tylenol para Paracetamol), os outros são Similares ou Genéricos.
+  Classifique corretamente cada nome comercial como 'Referência', 'Similar' ou 'Genérico'. 
   Identifique claramente os sintomas tratados como palavras-chave únicas (ex: ["dor", "febre", "inflamação"]).`;
 
   const response = await ai.models.generateContent({
@@ -55,22 +54,48 @@ export async function fetchDrugKnowledge(activeIngredient: string) {
   return JSON.parse(response.text);
 }
 
-export async function getPharmaChatResponse(history: { role: 'user' | 'model', parts: { text: string }[] }[], context: DrugRecord[]) {
+export async function generateAIAssistance(mode: 'explain' | 'offer' | 'compare', drug1: string, drug2?: string) {
   const model = 'gemini-3-flash-preview';
   
-  const systemInstruction = `Você é um assistente farmacêutico experiente chamado PharmaChat da Farmácias Econômica. 
-  Use o contexto dos medicamentos cadastrados no banco de dados para responder dúvidas de balconistas. 
-  Seja conciso e técnico. 
-  Sempre alerte para consultar o farmacêutico responsável em casos graves ou dúvidas críticas.
-  Aqui está a base de conhecimento atual (Princípios Ativos): ${JSON.stringify(context.map(c => ({ name: c.name, indications: c.indications, symptoms: c.symptoms }))) }.`;
+  let prompt = '';
+  if (mode === 'explain') {
+    prompt = `Explique objetivamente o que é e para que serve "${drug1}".`;
+  } else if (mode === 'offer') {
+    prompt = `Dê 3 argumentos rápidos e profissionais de venda para oferecer "${drug1}" ao cliente no balcão.`;
+  } else if (mode === 'compare') {
+    prompt = `Compare brevemente "${drug1}" e "${drug2}". Liste apenas as diferenças principais e quando preferir um ao outro.`;
+  }
 
   const response = await ai.models.generateContent({
     model,
-    contents: history.map(h => ({ role: h.role, parts: h.parts })),
+    contents: prompt,
     config: {
-      systemInstruction,
+      systemInstruction: `Você é um consultor farmacêutico direto e prático. 
+      REGRAS CRÍTICAS: 
+      1. NÃO use saudações como "Olá", "Entendi", "Aqui está". 
+      2. Vá direto ao ponto, comece a resposta imediatamente com a informação. 
+      3. USE APENAS TEXTO PURO. NÃO use asteriscos (**), hashtags (#), hífens (-) como marcadores ou tabelas. 
+      4. Se precisar listar algo, use apenas números ou quebras de linha simples. 
+      5. Seja extremamente objetivo, focado em leitura rápida de 5 segundos.`,
     }
   });
 
   return response.text;
+}
+
+export async function getPharmaChatResponse(history: any[], drugs: DrugRecord[]) {
+  const model = 'gemini-3-flash-preview';
+  const drugsContext = drugs.length > 0 
+    ? drugs.map(d => `- ${d.name}: ${d.indications.substring(0, 80)}...`).join('\n')
+    : "Nenhum medicamento no catálogo.";
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: history,
+    config: {
+      systemInstruction: `Você é um assistente técnico. Seja curto e use apenas texto puro sem markdown.`,
+    }
+  });
+
+  return response.text || "Erro na geração.";
 }

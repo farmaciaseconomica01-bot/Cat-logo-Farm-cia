@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, User, Loader2, AlertTriangle, Trash2, Minus, Maximize2, PlusCircle } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, User, Loader2, AlertTriangle, Trash2, Minus, PlusCircle } from 'lucide-react';
 import { getPharmaChatResponse } from '../services/geminiService';
 import { DrugRecord } from '../types';
 
@@ -49,10 +49,21 @@ const PharmaChat: React.FC<PharmaChatProps> = ({ drugs }) => {
     }
   };
 
-  const clearChat = () => {
-    if (window.confirm("Deseja apagar o histórico do chat atual?")) {
+  const clearChat = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm("Deseja apagar permanentemente o histórico do chat atual para liberar memória?")) {
       setMessages([]);
+      setInput('');
+      setIsLoading(false);
     }
+  };
+
+  const startNewChat = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMessages([]);
+    setInput('');
+    setIsOpen(true);
+    setIsMinimized(false);
   };
 
   const toggleMinimize = () => {
@@ -64,11 +75,11 @@ const PharmaChat: React.FC<PharmaChatProps> = ({ drugs }) => {
       {(!isOpen || isMinimized) && (
         <button 
           onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-          className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform relative"
+          className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-300 relative border-2 border-white dark:border-slate-700"
         >
           <MessageSquare />
-          {messages.length > 0 && isMinimized && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">
+          {messages.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse border-2 border-white dark:border-slate-700">
               {messages.length}
             </span>
           )}
@@ -76,44 +87,69 @@ const PharmaChat: React.FC<PharmaChatProps> = ({ drugs }) => {
       )}
 
       {isOpen && !isMinimized && (
-        <div className="w-80 md:w-96 h-[500px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">
+        <div className="w-80 md:w-96 h-[500px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-300">
           {/* Header */}
           <div className="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
-            <div className="flex items-center gap-2">
-              <Bot size={20} className="text-accent" />
+            <div className="flex items-center gap-3">
+              <div className="bg-accent p-1.5 rounded-lg">
+                <Bot size={18} className="text-white" />
+              </div>
               <div>
-                <h3 className="font-bold text-sm uppercase tracking-widest">PharmaChat</h3>
-                <span className="text-[10px] text-slate-400 font-black uppercase">IA Balconista</span>
+                <h3 className="font-bold text-sm uppercase tracking-widest leading-none mb-1">PharmaChat</h3>
+                <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">IA de Apoio ao Balcão</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={clearChat} title="Limpar conversa" className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
-                <Trash2 size={16} />
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={startNewChat} 
+                title="Novo Chat" 
+                className="p-2 hover:bg-white/10 rounded-xl text-slate-400 hover:text-emerald-400 transition-colors"
+              >
+                <PlusCircle size={18} />
               </button>
-              <button onClick={toggleMinimize} title="Minimizar" className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors">
+              <button 
+                onClick={clearChat} 
+                title="Limpar Conversa" 
+                className="p-2 hover:bg-white/10 rounded-xl text-slate-400 hover:text-red-400 transition-colors"
+              >
+                <Trash2 size={18} />
+              </button>
+              <button 
+                onClick={toggleMinimize} 
+                title="Minimizar" 
+                className="p-2 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors"
+              >
                 <Minus size={18} />
               </button>
-              <button onClick={() => setIsOpen(false)} title="Fechar" className="p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors">
+              <button 
+                onClick={() => { setIsOpen(false); setMessages([]); }} 
+                title="Fechar e Limpar" 
+                className="p-2 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors"
+              >
                 <X size={18} />
               </button>
             </div>
           </div>
 
-          {/* Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-900/50">
+          {/* Messages Area */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50 dark:bg-slate-900/50 scrollbar-hide">
             {messages.length === 0 && (
-              <div className="text-center py-12 px-6">
-                <Bot className="mx-auto text-slate-300 dark:text-slate-700 mb-4" size={48} />
-                <p className="text-xs text-slate-500 font-black uppercase tracking-widest mb-2">Novo Chat Iniciado</p>
-                <p className="text-xs text-slate-400">Olá! Estou pronto para ajudar com dúvidas sobre medicamentos, interações e posologia.</p>
+              <div className="text-center py-12 px-8">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Bot className="text-slate-400" size={32} />
+                </div>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mb-3">Assistente Ativo</p>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Tire dúvidas técnicas, pergunte sobre interações ou peça resumos de posologia dos itens cadastrados.
+                </p>
               </div>
             )}
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl p-3 text-xs font-medium leading-relaxed ${
+                <div className={`max-w-[85%] rounded-2xl p-3.5 text-xs font-medium leading-relaxed shadow-sm ${
                   m.role === 'user' 
-                    ? 'bg-accent text-white rounded-tr-none shadow-lg shadow-accent/10' 
-                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none shadow-sm'
+                    ? 'bg-accent text-white rounded-tr-none' 
+                    : 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none'
                 }`}>
                   {m.text}
                 </div>
@@ -121,20 +157,20 @@ const PharmaChat: React.FC<PharmaChatProps> = ({ drugs }) => {
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none p-3 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl rounded-tl-none p-3.5 shadow-sm">
                   <Loader2 className="animate-spin text-accent" size={16} />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Disclaimer */}
+          {/* Warning Bar */}
           <div className="bg-amber-50 dark:bg-amber-900/10 px-4 py-2 flex items-center gap-2 border-t border-amber-100 dark:border-amber-900/30 shrink-0">
             <AlertTriangle size={12} className="text-amber-600 shrink-0" />
-            <p className="text-[10px] text-amber-700 dark:text-amber-500 font-bold uppercase tracking-tight">Consulte sempre o farmacêutico em caso de dúvida crítica.</p>
+            <p className="text-[9px] text-amber-700 dark:text-amber-500 font-black uppercase tracking-tight">Consulte o RT para casos críticos.</p>
           </div>
 
-          {/* Input */}
+          {/* Input Area */}
           <div className="p-4 border-t dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
             <form 
               onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -143,13 +179,13 @@ const PharmaChat: React.FC<PharmaChatProps> = ({ drugs }) => {
               <input 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Dúvida técnica..."
-                className="flex-1 bg-slate-100 dark:bg-slate-900 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white focus:ring-2 focus:ring-accent outline-none"
+                placeholder="Digite sua dúvida aqui..."
+                className="flex-1 bg-slate-100 dark:bg-slate-900 border-none rounded-xl px-4 py-3 text-xs font-bold dark:text-white focus:ring-2 focus:ring-accent outline-none placeholder:text-slate-400"
               />
               <button 
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="bg-slate-900 dark:bg-accent text-white p-3 rounded-xl disabled:bg-slate-300 dark:disabled:bg-slate-700 transition-colors shadow-lg"
+                className="bg-slate-900 dark:bg-accent text-white p-3.5 rounded-xl disabled:bg-slate-200 dark:disabled:bg-slate-800 transition-all shadow-lg active:scale-95"
               >
                 <Send size={18} />
               </button>

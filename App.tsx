@@ -3,12 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Plus, Database, Menu, X, Pill, 
   LayoutDashboard, Settings, TrendingUp, ShieldCheck, 
-  Clock, Moon, Sun, Palette, Type, CheckCircle2, ChevronRight, Tag, Heart
+  Clock, Moon, Sun, Palette, Type, CheckCircle2, ChevronRight, Tag, Heart,
+  Sparkles, MessageCircle, GitCompare, Info, Loader2, RefreshCcw
 } from 'lucide-react';
 import { DrugRecord, SearchFilters, DrugType, AppTab, AppSettings, FontFamily } from './types';
 import DrugCard from './components/DrugCard';
 import DrugForm from './components/DrugForm';
-import PharmaChat from './components/PharmaChat';
+import { generateAIAssistance } from './services/geminiService';
 
 const INITIAL_DATA: DrugRecord[] = [
   {
@@ -84,6 +85,13 @@ const App: React.FC = () => {
     types: []
   });
 
+  // IA Assistência State
+  const [aiInput1, setAiInput1] = useState('');
+  const [aiInput2, setAiInput2] = useState('');
+  const [aiMode, setAiMode] = useState<'explain' | 'offer' | 'compare'>('explain');
+  const [aiResult, setAiResult] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
   // Rotação de frases
   useEffect(() => {
     const interval = setInterval(() => {
@@ -118,7 +126,6 @@ const App: React.FC = () => {
     document.documentElement.style.setProperty('--accent-hover', color.hover);
     document.documentElement.style.setProperty('--accent-soft', color.soft);
     
-    // Forçar atualização de classes dinâmicas
     document.body.style.fontFamily = `var(--font-${settings.fontFamily})`;
   }, [settings]);
 
@@ -182,6 +189,21 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleGenerateAI = async () => {
+    if (!aiInput1 || (aiMode === 'compare' && !aiInput2)) return;
+    setIsAiLoading(true);
+    setAiResult('');
+    try {
+      const res = await generateAIAssistance(aiMode, aiInput1, aiInput2);
+      setAiResult(res || 'Sem resposta disponível.');
+    } catch (e) {
+      console.error(e);
+      setAiResult('Erro de conexão com o servidor de IA.');
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const renderDashboard = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -193,6 +215,83 @@ const App: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          {/* IA Assistance Tool - Ultra Objective Version */}
+          <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border-2 border-accent/20 dark:border-slate-700 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+                  <Sparkles size={24} className="text-accent animate-pulse" /> Assistência Rápida IA
+                </h3>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Gere argumentos diretos para o cliente</p>
+              </div>
+              
+              <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl">
+                <button 
+                  onClick={() => { setAiMode('explain'); setAiResult(''); }}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${aiMode === 'explain' ? 'bg-accent text-white shadow-lg' : 'text-slate-500'}`}
+                >
+                  O que é?
+                </button>
+                <button 
+                  onClick={() => { setAiMode('offer'); setAiResult(''); }}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${aiMode === 'offer' ? 'bg-accent text-white shadow-lg' : 'text-slate-500'}`}
+                >
+                  Como vender?
+                </button>
+                <button 
+                  onClick={() => { setAiMode('compare'); setAiResult(''); }}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${aiMode === 'compare' ? 'bg-accent text-white shadow-lg' : 'text-slate-500'}`}
+                >
+                  Comparar
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
+              <div className={`${aiMode === 'compare' ? 'md:col-span-5' : 'md:col-span-9'}`}>
+                <input 
+                  type="text" 
+                  placeholder={aiMode === 'compare' ? "Remédio A..." : "Nome do medicamento..."}
+                  value={aiInput1}
+                  onChange={(e) => setAiInput1(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-xs font-bold dark:text-white focus:border-accent outline-none transition-all uppercase"
+                />
+              </div>
+              {aiMode === 'compare' && (
+                <div className="md:col-span-4">
+                  <input 
+                    type="text" 
+                    placeholder="Remédio B..."
+                    value={aiInput2}
+                    onChange={(e) => setAiInput2(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-xs font-bold dark:text-white focus:border-accent outline-none transition-all uppercase"
+                  />
+                </div>
+              )}
+              <div className="md:col-span-3">
+                <button 
+                  onClick={handleGenerateAI}
+                  disabled={isAiLoading || !aiInput1}
+                  className="w-full h-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase text-[10px] tracking-widest py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-xl disabled:opacity-50"
+                >
+                  {isAiLoading ? <Loader2 size={18} className="animate-spin" /> : <RefreshCcw size={18} />}
+                  Gerar Texto
+                </button>
+              </div>
+            </div>
+
+            {aiResult && (
+              <div className="mt-8 p-8 bg-slate-50 dark:bg-slate-900/60 rounded-3xl border border-slate-200 dark:border-slate-700 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="whitespace-pre-wrap text-slate-700 dark:text-slate-300 text-sm font-bold leading-relaxed font-mono">
+                  {aiResult}
+                </div>
+                <div className="mt-6 pt-4 border-t dark:border-slate-700 flex justify-end">
+                  <button onClick={() => setAiResult('')} className="text-slate-400 hover:text-red-500 flex items-center gap-1 text-[10px] font-black uppercase tracking-widest"><X size={14} /> Limpar</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-2">
@@ -293,13 +392,13 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 pb-40">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-40">
         {filteredDrugs.length > 0 ? (
           filteredDrugs.map(drug => (
             <DrugCard key={drug.id} drug={drug} onDelete={handleDeleteDrug} onEdit={handleEditDrug} />
           ))
         ) : (
-          <div className="text-center py-32 bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+          <div className="col-span-full text-center py-32 bg-white dark:bg-slate-800 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
             <Pill size={48} className="mx-auto text-slate-200 dark:text-slate-600 mb-6" />
             <p className="text-slate-400 dark:text-slate-500 font-black uppercase text-[10px] tracking-[0.3em]">Base de dados vazia para este filtro.</p>
           </div>
@@ -485,8 +584,6 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
-
-      <PharmaChat drugs={drugs} />
     </div>
   );
 };
